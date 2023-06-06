@@ -1,7 +1,6 @@
 import json
 import pickle
 import random
-
 import nltk
 import numpy
 # import speech_recognition as sr
@@ -9,15 +8,13 @@ import numpy
 import matplotlib.pyplot as plt
 from nlp_id.lemmatizer import Lemmatizer  # library pendeteksi kata yang berhimbuan awalan kata dan akhiran kata
 from nlp_id.tokenizer import Tokenizer  # pemisahan kalimat yang akan diformat bentuk tag dengan acuan tiap spasi (per character)
-from tensorflow.python.keras.layers import Dense, Dropout
+from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.models import Sequential  # library pelatihan menggunakan metode sequential
 from tensorflow.python.keras.models import model_from_yaml  # library perubahan format data training ke yaml
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 import re
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
 
 nltk.download('punkt')
 
@@ -25,7 +22,7 @@ nltk.download('punkt')
 lemmatizer = Lemmatizer()  # pemanggilan fungsi lemmatizer
 tokenizer = Tokenizer()  # pemanggilan fungsi tokenizer
 
-with open("intents2.json") as file:
+with open("intents3.json") as file:
     data = json.load(file)
 
 try:
@@ -39,8 +36,7 @@ except:
     docs_y = []
     del_words = ['dan', 'saya', 'aku', ',', 'tidak', 'dari', 'suka', 'ingin', 'tau', 'sangat', 'mata', 'lebih', 'mau',
                  'ketika', 'sifat', 'oh', 'seperti', 'itu', 'selesai', 'nggak', 'gampang', 'jatuh', 'gak', 'terlalu',
-                 'yang',
-                 'lakukan', 'dalam', 'adalah', 'sebagai', 'berbagai', 'takut']
+                 'yang', 'lakukan', 'dalam', 'adalah', 'sebagai', 'berbagai', 'takut']
 
     for intent in data["intents"]:
         for pattern in intent["patterns"]:
@@ -96,16 +92,19 @@ try:
 except:
     # pembuatan layer neural network
     myChatModel = Sequential()
-    myChatModel.add(Dense(128, input_shape=[len(words)], activation='relu'))
-    myChatModel.add(Dropout(0.5))
-    myChatModel.add(Dense(64, activation='relu'))
-    myChatModel.add(Dropout(0.5))
+    myChatModel.add(Dense(8, input_shape=[len(words)], activation='relu'))
+    # myChatModel.add(Dense(64, activation='relu'))
+    # myChatModel.add(Conv1D(8, 8, strides=4, activation="relu"))
+
+    # myChatModel.add(Dropout(0.5))
     myChatModel.add(Dense(len(labels), activation='softmax'))
+    epochs = 1000
+    # loss = tensorflow.keras.losses.CategoricalCrossentropy(from_logits=True)
 
     # optimize model
+    myChatModel.summary()
     myChatModel.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-    epochs = 100
     # train model
     history = myChatModel.fit(training, output, epochs=epochs, batch_size=8)
 
@@ -135,12 +134,10 @@ except:
 
 
 def bag_of_words(s, words):
-    dele_words = ['dan', 'saya', 'aku', ',', 'tidak', 'dari', 'suka', 'ingin', 'tau', 'sangat', 'mata', 'lebih', 'mau',
-                  "buat"
+    dele_words = ['dan', 'saya', 'aku', ',', 'tidak', 'dari', 'suka', 'ingin', 'tau', 'sangat', 'mata', 'lebih', 'mau', 'buat'
                   'ketika', 'sifat', 'oh', 'seperti', 'itu', 'selesai', 'nggak', 'gampang', 'jatuh', 'gak', 'terlalu',
-                  "laku" "pada"
-                  'yang', 'lakukan', 'dalam', 'adalah', 'sebagai', 'berbagai', 'takut', "di", "yaitu", "paling",
-                  "banyak", "nya", "sebut"]
+                  'laku', 'pada', 'yang', 'lakukan', 'dalam', 'adalah', 'sebagai', 'berbagai', 'takut', 'di', 'yaitu', 'paling',
+                  'banyak', 'nya', 'sebut']
     list_check = 0
 
     bags = [0 for _ in range(len(words))]
@@ -201,60 +198,60 @@ def chat_with_bot(input_text):
     # print("I didn't get that, try again")
 
 
-@app.route("/", methods=['GET', 'POST'])
+@app.route("/chat", methods=['GET', 'POST'])
 def post():
     selectInput = request.form['select']
     chatInput = request.form['chatInput']
 
     if selectInput == "0":
-        resp, pres, maks = chat_with_bot(chatInput)
-        list_job = []
-        highListJob = []
-        for ada in range(maks):
-            if pres[ada] >= 3:
-                if resp[ada] == "Relating":
+        resp1, pres1, maks1 = chat_with_bot(chatInput)
+        list_job1 = []
+        highListJob1 = []
+        for ada in range(maks1):
+            if pres1[ada] >= 3:
+                if resp1[ada] == "Relating":
                     continue
-                elif resp[ada] == "Thinking":
+                elif resp1[ada] == "Thinking":
                     continue
-                elif resp[ada] == "Impacting":
+                elif resp1[ada] == "Impacting":
                     continue
-                elif resp[ada] == "Striving":
+                elif resp1[ada] == "Striving":
                     continue
                 else:
-                    list_job.append("Skill: {}, {:0.2f}%".format(resp[ada], pres[ada]))
+                    list_job1.append("Skill: {}, {:0.2f}%".format(resp1[ada], pres1[ada]))
 
-        sorting = sorted(list_job, key=lambda s: float(re.search(r'(\d+)\.', s).groups()[0]))
+        sorting = sorted(list_job1, key=lambda s: float(re.search(r'(\d+)\.', s).groups()[0]))
 
         for i in range(1, 6):
-            highListJob.append(sorting[-i])
+            highListJob1.append(sorting[-i])
 
-        datax = '\n'.join(map(str, highListJob))
+        datax = '\n'.join(map(str, highListJob1))
         return jsonify(chatBotReply="Rekomendasi :\n{}".format(datax))
 
     elif selectInput == "1":
-        resp, pres, maks = chat_with_bot(chatInput)
-        list_job = []
-        highListJob = []
+        resp2, pres2, maks2 = chat_with_bot(chatInput)
+        list_job2 = []
+        highListJob2 = []
 
-        for ada in range(maks):
-            if pres[ada] >= 3:
-                if resp[ada] == "Relating":
+        for ada in range(maks2):
+            if pres2[ada] >= 2:
+                if resp2[ada] == "Relating":
                     continue
-                elif resp[ada] == "Thinking":
+                elif resp2[ada] == "Thinking":
                     continue
-                elif resp[ada] == "Impacting":
+                elif resp2[ada] == "Impacting":
                     continue
-                elif resp[ada] == "Striving":
+                elif resp2[ada] == "Striving":
                     continue
                 else:
-                    list_job.append("Skill: {}, {:0.2f}%".format(resp[ada], pres[ada]))
+                    list_job2.append("Skill: {}, {:0.2f}%".format(resp2[ada], pres2[ada]))
 
-        sorting = sorted(list_job, key=lambda s: float(re.search(r'(\d+)\.', s).groups()[0]))
+        sorting = sorted(list_job2, key=lambda s: float(re.search(r'(\d+)\.', s).groups()[0]))
 
         for i in range(1, 6):
-            highListJob.append(sorting[-i])
+            highListJob2.append(sorting[-i])
 
-        datac = '\n'.join(map(str, highListJob))
+        datac = '\n'.join(map(str, highListJob2))
         return jsonify(chatBotReply="Tidak Rekomendasi :\n{}".format(datac))
 
     else:
@@ -276,4 +273,4 @@ def post():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='192.168.230.231', port=5050, debug=True)

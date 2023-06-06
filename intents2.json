@@ -831,15 +831,6 @@
          "responses": ["Cyber Security"],
          "context_set": ""
         },
-        {"tag": "Security Engineer",
-         "patterns": ["matematika", "logika", "coding", "fisika", "logis", "program", "teliti", "ipa",
-         "teknik", "komputer", "ilmu", "sistem", "informatika", "operasi", "teknologi",
-         "tau", "troubleshooting", "masalah", "pemecah", "kolaborasi", "tim", "algoritma", "kode",
-         "inggris", "dokumentasi", "kreatif", "inovasi", "debugging", "solving", "waktu", "manajemen", "komunikasi",
-         "bicara", "informasi", "berbagi", "networking", "adaptasi"],
-         "responses": ["Security Engineer"],
-         "context_set": ""
-        },
         {"tag": "Security Architecture",
          "patterns": ["matematika", "logika", "coding", "fisika", "logis", "program", "teliti", "ipa",
          "teknik", "komputer", "ilmu", "sistem", "informatika", "operasi", "teknologi",

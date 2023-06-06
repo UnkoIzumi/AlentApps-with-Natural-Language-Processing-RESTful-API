@@ -7,6 +7,8 @@ import numpy
 # import speech_recognition as sr
 # from nltk.stem import LancasterStemmer
 import matplotlib.pyplot as plt
+from tensorflow.keras.optimizers import SGD
+from nlp_id.stopword import StopWord
 from nlp_id.lemmatizer import Lemmatizer  # library pendeteksi kata yang berhimbuan awalan kata dan akhiran kata
 from nlp_id.tokenizer import Tokenizer  # pemisahan kalimat yang akan diformat bentuk tag dengan acuan tiap spasi (per character)
 from tensorflow.python.keras.layers import Dense, Dropout
@@ -16,11 +18,15 @@ from tensorflow.python.keras.models import model_from_yaml  # library perubahan 
 nltk.download('punkt')
 
 # stemmer = LancasterStemmer()
+stopwords = StopWord()
 lemmatizer = Lemmatizer()  # pemanggilan fungsi lemmatizer
 tokenizer = Tokenizer()  # pemanggilan fungsi tokenizer
 
-with open("intents2.json") as file:
+with open("intents.json") as file:
     data = json.load(file)
+
+delete_word = ['?', '(', ')', ',', '!', '@', '$', '/', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12',
+               '']
 
 try:
     with open("chatbot.pickle", "rb") as file:
@@ -31,24 +37,23 @@ except:
     labels = []
     docs_x = []
     docs_y = []
-    del_words = ['dan', 'saya', 'aku', ',', 'tidak', 'dari', 'suka', 'ingin', 'tau', 'sangat', 'mata', 'lebih', 'mau',
-                 'ketika', 'sifat', 'oh', 'seperti', 'itu', 'selesai', 'nggak', 'gampang', 'jatuh', 'gak', 'terlalu',
-                 'yang',
-                 'lakukan', 'dalam', 'adalah', 'sebagai', 'berbagai', 'takut']
 
     for intent in data["intents"]:
         for pattern in intent["patterns"]:
+            # mengambil kata dan tokenize (pecah)
             wrds = tokenizer.tokenize(pattern)
             words.extend(wrds)
             docs_x.append(wrds)
             docs_y.append(intent["tag"])
 
+        # jika label diluar list
         if intent["tag"] not in labels:
             labels.append(intent["tag"])
 
-    words = [lemmatizer.lemmatize(w.lower()) for w in words if w not in del_words]
-    words = sorted(list(set(words)))
+    words = [stopwords.remove_stopword(ws.lower()) for ws in words]
+    words = [lemmatizer.lemmatize(w) for w in words if w not in delete_word]
 
+    words = sorted(list(set(words)))
     labels = sorted(list(set(labels)))
 
     training = []
@@ -58,7 +63,6 @@ except:
 
     for x, doc in enumerate(docs_x):
         bag = []
-
         wrds = [lemmatizer.lemmatize(w.lower()) for w in doc]
 
         for w in words:
@@ -73,6 +77,8 @@ except:
         training.append(bag)
         output.append(output_row)
 
+    random.shuffle(training)
+    random.shuffle(output)
     training = numpy.array(training)
     output = numpy.array(output)
 
@@ -89,19 +95,22 @@ try:
 
 except:
     # pembuatan layer neural network
+
     myChatModel = Sequential()
     myChatModel.add(Dense(128, input_shape=[len(words)], activation='relu'))
-    myChatModel.add(Dropout(0.5))
     myChatModel.add(Dense(64, activation='relu'))
     myChatModel.add(Dropout(0.5))
     myChatModel.add(Dense(len(labels), activation='softmax'))
 
-    # optimize model
-    myChatModel.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
-    epochs = 100
+    # optimize model
+    myChatModel.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+
+    epochs = 1000
     # train model
-    history = myChatModel.fit(training, output, epochs=epochs, batch_size=8)
+    myChatModel.summary()
+    history = myChatModel.fit(training, output, epochs=epochs, batch_size=15, verbose=1)
 
     # ploting data
     epochs_range = range(epochs)
@@ -109,12 +118,14 @@ except:
     plt.figure(figsize=(15, 15))
     plt.subplot(2, 2, 1)
     plt.plot(epochs_range, history.history['accuracy'], color='g', label='Accuracy')
+    # plt.ylim(ymax=1)
     plt.legend(loc='upper right')
     plt.title('Training Accuracy')
 
     plt.subplot(2, 2, 2)
     plt.plot(epochs_range, history.history['loss'], color='r', label='Loss')
     plt.legend(loc='upper right')
+    # plt.ylim(ymax=1)
     plt.title('Training Loss')
     plt.show()
 
@@ -128,17 +139,13 @@ except:
     print("Saved model from disk")
 
 
-def bag_of_words(s, words):
-    dele_words = ['dan', 'saya', 'aku', ',', 'tidak', 'dari', 'suka', 'ingin', 'tau', 'sangat', 'mata', 'lebih', 'mau', "buat"
-                  'ketika', 'sifat', 'oh', 'seperti', 'itu', 'selesai', 'nggak', 'gampang', 'jatuh', 'gak', 'terlalu', "laku" "pada"
-                  'yang', 'lakukan', 'dalam', 'adalah', 'sebagai', 'berbagai', 'takut', "di", "yaitu", "paling", "banyak", "nya", "sebut"]
+def bag_of_words(s, word):
     list_check = 0
-
-    bags = [0 for _ in range(len(words))]
-
+    bags = [0 for _ in range(len(word))]
     # pemisahan kalimat mejadi per kata dari input suara
     s_words = tokenizer.tokenize(s)
-    s_words = [lemmatizer.lemmatize(word.lower()) for word in s_words if word not in dele_words]
+    s_words = [stopwords.remove_stopword(txt.lower()) for txt in s_words]
+    s_words = [lemmatizer.lemmatize(word) for word in s_words if word not in delete_word]
     print(s_words)
 
     for se in s_words:
@@ -147,11 +154,12 @@ def bag_of_words(s, words):
                 list_check += 1
                 bags[i] = 1
 
-    list_error = (((len(s_words))-list_check) / (len(s_words))) * 100
+    # kata yang valid dan cocok dengan dataset
+    list_error = (((len(s_words)) - list_check) / (len(s_words))) * 100
     list_acc = (list_check / (len(s_words))) * 100
     print("Data Sukses : {:0.2f}%".format(list_acc))
     print("Data Loss : {:0.2f}%".format(list_error))
-    return numpy.array(bags), list_check
+    return numpy.array(bags), s_words
 
 
 # input = data dari speech recognition yang akan diuabh menjadi text
@@ -170,26 +178,61 @@ def chat_with_bot(input_text):
     result_index = result[-1]
     dataindex = len(result_index)
 
-    presx = [0 for _ in range(dataindex)]
-    respx = [0 for _ in range(dataindex)]
+    presx = []
+    respx = []
+    countJobs = 0
 
     for datai in range(dataindex):
         tag = labels[datai]
         # tagdata = result[0][datai]
-        # if tagdata > 0.2:
         for tg in data["intents"]:
             if tg['tag'] == tag:
-                patterns = tg['patterns']
+                patternx = tg['patterns']
                 responses = tg['responses']
-                numpola = len(patterns)
+                wordsx, txtz = classificate(patternx, wordz)
+                numpola = len(wordsx)
 
-                presx[datai] = (wordz / numpola) * 100
-                respx[datai] = random.choice(responses)
+                print("========================")
+                print("Data pattern Raw: {}".format(numpola))
+                print("Data pattern Valid: {}".format(txtz))
+                if len(responses) > 1:
+                    print("Data Responses: {}".format(len(responses)))
+                    print(responses)
+                    print("========================")
+                    for xmax in range(len(responses)):
+                        presx.append(((txtz + int(numpola*0.3)) / numpola) * 100)
+                        respx.append(responses[xmax])
+                        countJobs += 1
+                else:
+                    print("Data Responses: {}".format(len(responses)))
+                    print(responses)
+                    print("========================")
+                    presx.append(((txtz + int(numpola*0.3)) / numpola) * 100)
+                    respx.append(responses[0])
+                    countJobs += 1
 
-    return respx, presx, dataindex
+    return respx, presx, countJobs
 
     # else:
     # print("I didn't get that, try again")
+
+
+def classificate(patternsc, wordsc):
+    wordx = []
+    checkdata = 0
+
+    for patterns in patternsc:
+        dataPattern = tokenizer.tokenize(patterns)
+        wordx.extend(dataPattern)
+
+    wordx = [stopwords.remove_stopword(text.lower()) for text in wordx]
+    wordx = [lemmatizer.lemmatize(txt) for txt in wordx if txt not in delete_word]
+
+    for wc in wordsc:
+        if wc in wordx:
+            checkdata += 1
+
+    return wordx, checkdata
 
 
 def chat():
